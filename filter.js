@@ -1,10 +1,7 @@
-if(Meteor.isClient){
-
 Session.set("filter_counter", [1]);
 Session.set("filter_selector", '');
 Session.set("filter_queries", {});
 Session.set("filter_ops", {});
-
 
 var object_values = function(obj){
     var values = [];
@@ -26,6 +23,8 @@ create_selector = function(field, operator, value, type, options){
         case "=":
             if(type == "Number")
                 value = Number(value);
+            if(type == "SimpleSchema.Integer")
+                value = parseInt(value);
             if(type == "Date")
                 value = new Date(value);
             if(type == "Boolean")
@@ -36,6 +35,8 @@ create_selector = function(field, operator, value, type, options){
         case ">":
             if(type == "Number")
                 value = Number(value);
+            if(type == "SimpleSchema.Integer")
+                value = parseInt(value);
             if(type == "Date")
                 value = new Date(value);
             select[field] = {$gt: value};
@@ -44,6 +45,8 @@ create_selector = function(field, operator, value, type, options){
         case "<":
             if(type == "Number")
                 value = Number(value);
+            if(type == "SimpleSchema.Integer")
+                value = parseInt(value);
             if(type == "Date")
                 value = new Date(value);
             select[field] = {$lt: value};
@@ -87,27 +90,69 @@ Template.filter_fields.helpers({
     },
     fields: function(){
         var input = Session.get("tabular-filter")
+
         if(!input)
             input = Session.get("schema")
+
         if(input){
             if(typeof input == 'object')
                 var schema = input.schema
             else
                 var schema = input
-            var fieldObj = Schemas[schema].schema();
-            var keys = Object.keys(fieldObj);
-            var fieldArr = [], ind;
-            for(k in keys){
-                if(!fieldObj[keys[k]].tabularFilterOmit && keys[k].substring([keys[k].length-2]) != '.$') {
-                    ind = keys[k].indexOf('.$.')
-                    if(ind !== -1)
-                        fieldObj[keys[k]].value = keys[k].substring(0,ind) + keys[k].substring(ind+2)
-                    else
-                        fieldObj[keys[k]].value = keys[k];
-                    fieldArr.push(fieldObj[keys[k]]);
+
+            // array of fields added to filter
+            var fieldArr = [];
+
+            // function to add fields from a schema, that can be called recursively
+            function addSchemaFields(fieldObj, parentFieldObjs) {
+
+                console.log(fieldObj)
+                var keys = Object.keys(fieldObj);
+    
+                for(k in keys){
+                    let key = keys[k]   // key is field name in simple schema
+                    if (!fieldObj[key].tabularFilterOmit) {
+                        // we are not omitting this field
+    
+                        console.log(fieldObj[key].type.singleType);
+                        
+                        if (key.substring([key.length-2]) == '.$') {
+                            // this is an object, no need to include (but we will include the object's fields)
+                            continue;
+                        }
+                        
+                        let ind = key.indexOf('.$.');
+                        if (ind > -1)  {
+                            // this is an object property
+                            // NB: this only works to one level of nested objects!
+                            fieldObj[key].value = key.substring(0,ind) + key.substring(ind+2)
+    
+                        } 
+                        else if (fieldObj[key].type.singleType instanceof SimpleSchema) {
+                            // add 
+                            let thisParentFieldObjs = parentFieldObjs.slice()
+                            thisParentFieldObjs.push(key);
+                            // call this function recursively to add nested schema fields
+                            addSchemaFields(fieldObj[key].type.singleType.schema(), thisParentFieldObjs);
+                        }
+                        else {
+                            // add filter for this field
+                            let selectorFieldWithParents = parentFieldObjs.slice();     // copy array of strings
+                            selectorFieldWithParents.push(key);
+                            console.log(selectorFieldWithParents.join("."));
+                            
+                            fieldObj[key].value = selectorFieldWithParents.join(".");
+                            fieldArr.push(fieldObj[key]);
+                            
+                        }
+
+                    }
                 }
+
             }
-            return fieldArr;
+            addSchemaFields(window.Schemas[schema].schema(), []);
+
+           return fieldArr;
         }
     }
 });
@@ -125,7 +170,7 @@ Template.filter_fields.onCreated(function(){
     else{
         containsValue = "contains"
     }
-    operators = {
+    Template.operators = {
         "StringExact":[
             "="
         ],
@@ -135,6 +180,11 @@ Template.filter_fields.onCreated(function(){
             regExpValue
         ],
         "Number":[
+            "=",
+            ">",
+            "<"
+        ],
+        "SimpleSchema.Integer":[
             "=",
             ">",
             "<"
@@ -181,7 +231,7 @@ Template.filter_fields.events({
                 Blaze.render(Template.button_locations, document.getElementById('simple_filter' + no ));
             Session.set("autoform_options","{}");
             dropdown_select($(this)[0], "field" + no);
-            var type = $(this)[0].type.name;
+            var type = $(this)[0].type.singleType.name || $(this)[0].type.singleType;
             
             if ($(this)[0].exactMatch){
                 type = 'StringExact'; 
@@ -189,9 +239,9 @@ Template.filter_fields.events({
                 
             $("#field" + no + ":first-child").attr("field_type", type);
             $('#field_operations' + no ).html('');
-            Blaze.renderWithData(Template.filter_operations, {first: operators[type][0], all: operators[type], no: no}, document.getElementById('field_operations' + no ));
+            Blaze.renderWithData(Template.filter_operations, {first: Template.operators[type][0], all: Template.operators[type], no: no}, document.getElementById('field_operations' + no ));
             $('#field_value' + no ).html('');
-            $("#operator" + no + ":first-child").val(operators[type][0]);
+            $("#operator" + no + ":first-child").val(Template.operators[type][0]);
             if($(this)[0].allowedValues){
                 Blaze.renderWithData(Template.filter_value_select, {options: $(this)[0].allowedValues, no: no}, document.getElementById('field_value' + no ));
             }
@@ -375,6 +425,3 @@ Template.filter_value_input.helpers({
         return 'Input Value'
     }
 });
-
-
-}

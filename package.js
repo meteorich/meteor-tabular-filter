@@ -8,11 +8,15 @@ Package.describe({
 Package.onUse(function(api) {
   api.versionsFrom('1.2.1');
 
-  api.use(['jquery', 'deps', 'templating', 'ui', 'blaze', 'reactive-var', 'session'], 'client');
+  api.use(['jquery', 'deps', 'templating', 'ui', 'blaze', 'reactive-var', 'session', 'ecmascript'], 'client');
 
   api.addFiles([
     'filter.html',
     'filter.js',
     'filter.css'
   ], 'client');
+
+  // api.export('TabularFilter');
+  api.mainModule('filter.js', 'client');
+
 });
