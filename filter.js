@@ -106,7 +106,6 @@ Template.filter_fields.helpers({
             // function to add fields from a schema, that can be called recursively
             function addSchemaFields(fieldObj, parentFieldObjs) {
 
-                console.log(fieldObj)
                 var keys = Object.keys(fieldObj);
     
                 for(k in keys){
@@ -114,8 +113,6 @@ Template.filter_fields.helpers({
                     if (!fieldObj[key].tabularFilterOmit) {
                         // we are not omitting this field
     
-                        console.log(fieldObj[key].type.singleType);
-                        
                         if (key.substring([key.length-2]) == '.$') {
                             // this is an object, no need to include (but we will include the object's fields)
                             continue;
@@ -139,7 +136,6 @@ Template.filter_fields.helpers({
                             // add filter for this field
                             let selectorFieldWithParents = parentFieldObjs.slice();     // copy array of strings
                             selectorFieldWithParents.push(key);
-                            console.log(selectorFieldWithParents.join("."));
                             
                             fieldObj[key].value = selectorFieldWithParents.join(".");
                             fieldArr.push(fieldObj[key]);
